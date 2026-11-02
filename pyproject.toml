@@ -1,0 +1,122 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qqq-rsi-bot"
+version = "0.1.0"
+description = "QQQ signal / TQQQ execution RSI cross bot (paper by default, live disarmed)"
+requires-python = ">=3.12"
+dependencies = [
+    "ib_async>=2.0",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "pyyaml>=6.0",
+    "tzdata",
+    "exchange_calendars>=4.5",
+]
+
+[project.scripts]
+qqq-bot = "qqq_rsi_bot.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "import-linter>=2.0",
+    "pip-audit>=2.7",
+    "pre-commit>=3.7",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "types-PyYAML",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src/qqq_rsi_bot"]
+branch = true
+omit = [
+    "src/qqq_rsi_bot/__main__.py",
+    "src/qqq_rsi_bot/adapters/**",
+    "src/qqq_rsi_bot/cli.py",
+]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]
+
+[tool.importlinter]
+root_package = "qqq_rsi_bot"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers: each layer only imports from layers below it"
+type = "layers"
+layers = [
+    "qqq_rsi_bot.cli",
+    "qqq_rsi_bot.app",
+    "qqq_rsi_bot.runtime",
+    "qqq_rsi_bot.execution",
+    "qqq_rsi_bot.storage",
+    "qqq_rsi_bot.risk",
+    "qqq_rsi_bot.engine",
+    "qqq_rsi_bot.indicators",
+    "qqq_rsi_bot.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Strategy core never touches brokers, storage, runtime or I/O libraries"
+type = "forbidden"
+source_modules = [
+    "qqq_rsi_bot.core",
+    "qqq_rsi_bot.indicators",
+    "qqq_rsi_bot.engine",
+    "qqq_rsi_bot.risk",
+]
+forbidden_modules = [
+    "qqq_rsi_bot.adapters",
+    "qqq_rsi_bot.storage",
+    "qqq_rsi_bot.execution",
+    "qqq_rsi_bot.runtime",
+    "qqq_rsi_bot.app",
+    "qqq_rsi_bot.cli",
+    "ib_async",
+    "sqlite3",
+    "requests",
+    "urllib",
+]
+
+[[tool.importlinter.contracts]]
+name = "Broker adapters do not import strategy, execution or runtime code"
+type = "forbidden"
+source_modules = ["qqq_rsi_bot.adapters"]
+forbidden_modules = [
+    "qqq_rsi_bot.engine",
+    "qqq_rsi_bot.risk",
+    "qqq_rsi_bot.execution",
+    "qqq_rsi_bot.runtime",
+    "qqq_rsi_bot.app",
+    "qqq_rsi_bot.cli",
+    "qqq_rsi_bot.storage",
+]

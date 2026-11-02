@@ -1,0 +1,35 @@
+# Environment and secrets
+.env
+.env.local
+.env.production
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.coverage
+.coverage.*
+htmlcov/
+.import_linter_cache/
+
+# Runtime data at the project root only
+/data/
+*.sqlite3
+*.log
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~

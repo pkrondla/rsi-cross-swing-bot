@@ -1,0 +1,5 @@
+allocated_usd: 10000
+min_allocated_usd: 100
+max_allocated_usd: 5000000
+min_shares: 1
+allow_margin: false

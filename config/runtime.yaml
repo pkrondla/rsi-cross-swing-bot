@@ -1,0 +1,9 @@
+timezone: America/New_York
+session_open: "09:30"
+decision_time: "15:58"
+early_close_decision_time: "12:58"
+cancel_unfilled_at: "15:59:30"
+decision_deadline: "15:59:20"
+decision_retry_sec: 30
+hourly_from: "09:30"
+heartbeat_path: heartbeat.json
