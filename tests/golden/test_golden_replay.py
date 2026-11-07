@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from qqq_rsi_bot.app.replay import replay_bars
-from qqq_rsi_bot.core.models import Bar
+from rsi_cross_swing_bot.app.replay import replay_bars
+from rsi_cross_swing_bot.core.models import Bar
 
 
 def _synthetic_trend_then_dip_then_cross() -> list[Bar]:

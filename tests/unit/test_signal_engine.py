@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from qqq_rsi_bot.core.models import EntryReason, SignalAction
-from qqq_rsi_bot.engine.signal_engine import IndicatorSnapshot, evaluate
+from rsi_cross_swing_bot.core.models import EntryReason, SignalAction
+from rsi_cross_swing_bot.engine.signal_engine import IndicatorSnapshot, evaluate
 
 
 def _snap(

@@ -2,26 +2,25 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from pathlib import Path
-from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from qqq_rsi_bot.adapters.ib.client import FakeIbClient
-from qqq_rsi_bot.app.context import load_context
-from qqq_rsi_bot.app.serve import serve
-from qqq_rsi_bot.config.settings import Settings
-from qqq_rsi_bot.core.models import Quote
-from qqq_rsi_bot.execution.dry_run_venue import DryRunVenue
-from qqq_rsi_bot.execution.ib_venue import IbVenue
-from qqq_rsi_bot.execution.models import OrderIntent, OrderRecord, OrderStatus
-from qqq_rsi_bot.execution.order_manager import OrderManager
-from qqq_rsi_bot.runtime.arming import configured_mode_label
-from qqq_rsi_bot.runtime.calendar import next_wake
-from qqq_rsi_bot.runtime.guard import SafetyError, assert_order_config
-from qqq_rsi_bot.runtime.notify import TelegramNotifier, build_notifier
-from qqq_rsi_bot.runtime.telegram_commands import poll_updates
-from qqq_rsi_bot.storage.store import TradeStore
+from rsi_cross_swing_bot.adapters.ib.client import FakeIbClient
+from rsi_cross_swing_bot.app.context import load_context
+from rsi_cross_swing_bot.app.serve import serve
+from rsi_cross_swing_bot.config.settings import Settings
+from rsi_cross_swing_bot.core.models import Quote
+from rsi_cross_swing_bot.execution.dry_run_venue import DryRunVenue
+from rsi_cross_swing_bot.execution.ib_venue import IbVenue
+from rsi_cross_swing_bot.execution.models import OrderIntent, OrderRecord, OrderStatus
+from rsi_cross_swing_bot.execution.order_manager import OrderManager
+from rsi_cross_swing_bot.runtime.arming import configured_mode_label
+from rsi_cross_swing_bot.runtime.calendar import next_wake
+from rsi_cross_swing_bot.runtime.guard import SafetyError, assert_order_config
+from rsi_cross_swing_bot.runtime.notify import TelegramNotifier, build_notifier
+from rsi_cross_swing_bot.runtime.telegram_commands import poll_updates
+from rsi_cross_swing_bot.storage.store import TradeStore
 
 ET = ZoneInfo("America/New_York")
 
@@ -124,7 +123,7 @@ def test_order_manager_cancel(tmp_path: Path) -> None:
     )
     store = TradeStore(tmp_path / "t.sqlite3")
     om = OrderManager(DryRunVenue(broker.quote), store)
-    intent = OrderIntent("sig", "TQQQ", "BUY", 1, 50.1, "qqq-rsi:sig")
+    intent = OrderIntent("sig", "TQQQ", "BUY", 1, 50.1, "rsi-cross:sig")
     rec = om.submit(intent, datetime(2024, 6, 3, 15, 58, tzinfo=ET))
     om.cancel(rec, datetime(2024, 6, 3, 15, 59, tzinfo=ET))
     DryRunVenue(broker.quote).cancel(rec)
@@ -138,7 +137,7 @@ def test_ib_venue_empty_broker_id() -> None:
         }
     )
     venue = IbVenue(broker, "DU1")
-    intent = OrderIntent("sig", "TQQQ", "BUY", 1, 50.1, "qqq-rsi:sig")
+    intent = OrderIntent("sig", "TQQQ", "BUY", 1, 50.1, "rsi-cross:sig")
     rec = OrderRecord(intent, status=OrderStatus.NEW, broker_order_id="")
     assert venue.cancel(rec) is rec
     assert venue.poll(rec) is rec
@@ -157,6 +156,8 @@ def test_serve_with_telegram(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setenv("STRATEGY_CONFIG_PATH", str(repo / "config" / "strategy.yaml"))
     monkeypatch.setenv("RUNTIME_CONFIG_PATH", str(repo / "config" / "runtime.yaml"))
     monkeypatch.setenv("RISK_CONFIG_PATH", str(repo / "config" / "risk.yaml"))
+    monkeypatch.setenv("SLEEVES_CONFIG_PATH", str(repo / "config" / "sleeves.yaml"))
+    monkeypatch.setenv("SLEEVE", "tqqq")
     broker = FakeIbClient(
         bars=[],
         quotes={
@@ -166,11 +167,8 @@ def test_serve_with_telegram(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
         accounts=["DU123456"],
     )
     ctx = load_context(fake=broker)
-    with patch(
-        "qqq_rsi_bot.app.serve.poll_updates",
-        return_value=(1, [("99", "/status"), ("1", "/ignore")]),
-    ):
-        assert serve(ctx, once=True, sleep_fn=lambda _: None) == 0
+    # Telegram polling lives in rsi-bot telegram; serve only drains inbox + trades.
+    assert serve(ctx, once=True, sleep_fn=lambda _: None) == 0
 
 
 def test_next_wake_paths() -> None:

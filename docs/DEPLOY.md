@@ -1,7 +1,17 @@
-# Deploy the QQQ RSI bot to Windows EC2
+# Deploy the RSI cross swing bot to Windows EC2
 
-The bot runs in **`C:\qqq-rsi-bot`** as NSSM services **`QqqRsiBot`** and **`QqqRsiWatch`**.
-It does **not** stop or change `C:\orb-bot` / OrbBot.
+The bot runs in **`C:\rsi-cross-swing-bot`**. Sleeve serve services are created
+**automatically from** [`config/sleeves.yaml`](../config/sleeves.yaml):
+
+| Service | Process |
+|---|---|
+| `RsiCross-<sleeve>` | `rsi-bot serve --sleeve <sleeve>` (one per sleeve) |
+| `RsiCrossWatch` | `rsi-bot watchdog` (all sleeve heartbeats) |
+| `RsiCrossCtrl` | `rsi-bot telegram` (sole Telegram poller) |
+
+Adding a sleeve = edit `sleeves.yaml`, merge, redeploy. No CD/NSSM edits.
+
+It does **not** stop or change `C:\orb-bot` / OrbBot. First deploy migrates `C:\qqq-rsi-bot\data` if present.
 
 ## One-time host prerequisites
 
@@ -12,43 +22,53 @@ It does **not** stop or change `C:\orb-bot` / OrbBot.
   - Live default port **4001** (TWS live **7496**)
   - Read-Only API unchecked when orders are wanted
   - Auto restart enabled (weekly re-login after Saturday reset)
-- US equity market data that is **not** 15-minute delayed (e.g. NASDAQ Network C/UTP)
+- US equity market data that is **not** 15-minute delayed
 - Client Portal: Market Data API access enabled
 
-## GitHub environment `qqq-prod`
+## GitHub environment `prod`
+
+Put **only credentials** in Secrets. Everything else is a Variable.
 
 ### Secrets
 
 | Name | Purpose |
 |---|---|
-| `WINRM_PASSWORD` | Windows login |
-| `GH_PAT` | repo read for clone/pull |
-| `TELEGRAM_BOT_TOKEN` | dedicated BotFather bot |
-| `IB_ACCOUNT` | optional if set as a variable instead |
+| `WINRM_PASSWORD` | Windows login password |
+| `GH_PAT` | PAT with repo read (git clone/pull on the host) |
+| `TELEGRAM_BOT_TOKEN` | BotFather bot token |
 
 ### Variables
 
 | Name | Purpose |
 |---|---|
 | `WINRM_HOST` | EC2 public IP/DNS |
-| `WINRM_USERNAME` | Windows user |
-| `TELEGRAM_CHAT_ID` | chat id |
+| `WINRM_USERNAME` | Windows user (e.g. `Administrator`) |
+| `TELEGRAM_CHAT_ID` | Telegram chat id |
 | `IB_HOST` | usually `127.0.0.1` |
 | `IB_PORT` | `4002` paper Gateway / `4001` live |
-| `IB_CLIENT_ID` | unique integer (e.g. `17`) |
 | `IB_ACCOUNT` | paper `DU…` or live account id |
-| `ALLOCATED_USD` | sleeve capital |
+| `SLEEVE_ALLOCATIONS` | optional JSON capital overrides, e.g. `{"tqqq":"10000","aapl":"5000"}` |
 | `LIVE_MODE` | `paper` (default) or `live` |
 | `LIVE_ARMED` | `false` until intentional |
 | `DRY_RUN` | `true` (default) |
 | `HEALTHCHECK_URL` | optional |
 
+Default capital and IB client ids come from [`config/sleeves.yaml`](../config/sleeves.yaml). Each sleeve needs a **unique** `ib_client_id`.
+
+## Add a symbol
+
+1. Add a block under `sleeves:` in `config/sleeves.yaml` (unique `ib_client_id`).
+2. Merge to `main` and run CD.
+3. Confirm market data, keep dry-run, then `/status <sleeve>` / `/dryrun <sleeve> off` when ready.
+
+Orphan `RsiCross-*` services for sleeves removed from the YAML are deleted on the next deploy.
+
 ## Deploy
 
-Actions → **CD - Deploy QQQ RSI bot to Windows EC2** → Run workflow (always `main`).
+Actions → **CD - Deploy RSI cross swing bot to Windows EC2** → Run workflow (always `main`).
 
 Rollback on the host:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File C:\qqq-rsi-bot\scripts\deploy\Rollback-QqqRsiBot.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\rsi-cross-swing-bot\scripts\deploy\Rollback-RsiCrossBot.ps1
 ```

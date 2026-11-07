@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from qqq_rsi_bot.core.models import Bar, Quote
+from rsi_cross_swing_bot.core.models import Bar, Quote
 
 ET = ZoneInfo("America/New_York")
 

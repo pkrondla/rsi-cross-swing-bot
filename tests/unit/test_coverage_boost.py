@@ -6,37 +6,38 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from qqq_rsi_bot.adapters.ib.client import FakeIbClient
-from qqq_rsi_bot.app.context import load_context
-from qqq_rsi_bot.app.health import run_checks, status_report
-from qqq_rsi_bot.app.replay import replay_bars
-from qqq_rsi_bot.app.serve import flatten_bot_qty, serve
-from qqq_rsi_bot.app.watchdog import heartbeat_path, watchdog
-from qqq_rsi_bot.config.settings import (
+from rsi_cross_swing_bot.adapters.ib.client import FakeIbClient
+from rsi_cross_swing_bot.app.context import load_context
+from rsi_cross_swing_bot.app.health import run_checks, status_report
+from rsi_cross_swing_bot.app.replay import replay_bars
+from rsi_cross_swing_bot.app.serve import flatten_bot_qty, serve
+from rsi_cross_swing_bot.app.watchdog import heartbeat_path, watchdog
+from rsi_cross_swing_bot.config.settings import (
     AppConfig,
     RiskConfig,
     RuntimeConfig,
     Settings,
     StrategyConfig,
 )
-from qqq_rsi_bot.core.clock import FixedClock, SystemClock
-from qqq_rsi_bot.core.errors import DataUnavailableError, Reaction, must_halt, reaction_for
-from qqq_rsi_bot.core.models import Bar, Quote, SignalAction
-from qqq_rsi_bot.engine.signal_engine import compute_snapshot
-from qqq_rsi_bot.execution.ib_venue import IbVenue, map_ib_status
-from qqq_rsi_bot.execution.models import OrderIntent, OrderRecord, OrderStatus
-from qqq_rsi_bot.execution.order_manager import OrderManager
-from qqq_rsi_bot.risk.gate import RiskGate
-from qqq_rsi_bot.runtime.arming import configured_mode_label
-from qqq_rsi_bot.runtime.calendar import next_trading_day, next_wake, parse_hhmm
-from qqq_rsi_bot.runtime.day_stop import set_stopped
-from qqq_rsi_bot.runtime.guard import assert_order_config, run_startup_checks
-from qqq_rsi_bot.runtime.halt import clear_halt, halt_reason, is_halted, set_halt
-from qqq_rsi_bot.runtime.heartbeat import read_heartbeat, write_heartbeat
-from qqq_rsi_bot.runtime.notify import NullNotifier, build_notifier
-from qqq_rsi_bot.runtime.session import TradingSession, decision_due
-from qqq_rsi_bot.runtime.telegram_commands import CommandContext, handle_command
-from qqq_rsi_bot.storage.store import TradeStore
+from rsi_cross_swing_bot.core.clock import FixedClock, SystemClock
+from rsi_cross_swing_bot.core.errors import DataUnavailableError, Reaction, must_halt, reaction_for
+from rsi_cross_swing_bot.core.models import Bar, Quote, SignalAction
+from rsi_cross_swing_bot.engine.signal_engine import compute_snapshot
+from rsi_cross_swing_bot.execution.dry_run_venue import DryRunVenue
+from rsi_cross_swing_bot.execution.ib_venue import IbVenue, map_ib_status
+from rsi_cross_swing_bot.execution.models import OrderIntent, OrderRecord, OrderStatus
+from rsi_cross_swing_bot.execution.order_manager import OrderManager
+from rsi_cross_swing_bot.risk.gate import RiskGate
+from rsi_cross_swing_bot.runtime.arming import configured_mode_label
+from rsi_cross_swing_bot.runtime.calendar import next_trading_day, next_wake, parse_hhmm
+from rsi_cross_swing_bot.runtime.day_stop import set_stopped
+from rsi_cross_swing_bot.runtime.guard import assert_order_config, run_startup_checks
+from rsi_cross_swing_bot.runtime.halt import clear_halt, halt_reason, is_halted, set_halt
+from rsi_cross_swing_bot.runtime.heartbeat import read_heartbeat, write_heartbeat
+from rsi_cross_swing_bot.runtime.notify import NullNotifier, build_notifier
+from rsi_cross_swing_bot.runtime.session import TradingSession, decision_due
+from rsi_cross_swing_bot.runtime.telegram_commands import handle_command
+from rsi_cross_swing_bot.storage.store import TradeStore
 
 ET = ZoneInfo("America/New_York")
 
@@ -82,11 +83,14 @@ def test_health_and_status(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("STRATEGY_CONFIG_PATH", str(repo / "config" / "strategy.yaml"))
     monkeypatch.setenv("RUNTIME_CONFIG_PATH", str(repo / "config" / "runtime.yaml"))
     monkeypatch.setenv("RISK_CONFIG_PATH", str(repo / "config" / "risk.yaml"))
+    monkeypatch.setenv("SLEEVES_CONFIG_PATH", str(repo / "config" / "sleeves.yaml"))
+    monkeypatch.setenv("SLEEVE", "tqqq")
     ctx, _ = _ctx(tmp_path / "data")
     steps = run_checks(ctx)
     assert any(s.name == "gateway" and s.ok for s in steps)
     text = status_report(ctx)
     assert "mode=" in text
+    assert "sleeve=tqqq" in text
 
 
 def test_serve_once_and_watchdog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -100,12 +104,19 @@ def test_serve_once_and_watchdog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("STRATEGY_CONFIG_PATH", str(repo / "config" / "strategy.yaml"))
     monkeypatch.setenv("RUNTIME_CONFIG_PATH", str(repo / "config" / "runtime.yaml"))
     monkeypatch.setenv("RISK_CONFIG_PATH", str(repo / "config" / "risk.yaml"))
+    monkeypatch.setenv("SLEEVES_CONFIG_PATH", str(repo / "config" / "sleeves.yaml"))
+    monkeypatch.setenv("SLEEVE", "tqqq")
     ctx, _ = _ctx(data)
     assert serve(ctx, once=True, sleep_fn=lambda _: None) == 0
-    assert watchdog(ctx, once=True, max_age=timedelta(seconds=0)) in {0, 1}
-    write_heartbeat(data / "heartbeat.json", datetime.now(ET))
-    assert watchdog(ctx, once=True, max_age=timedelta(hours=2)) == 0
-    assert heartbeat_path(data).name == "heartbeat.json"
+    # Heartbeat is under data/sleeves/<id>/; watchdog checks every sleeve.
+    assert watchdog(once=True, max_age=timedelta(seconds=0)) in {0, 1}
+    now = datetime.now(ET)
+    for sid in ("tqqq", "goog"):
+        sleeve_dir = data / "sleeves" / sid
+        sleeve_dir.mkdir(parents=True, exist_ok=True)
+        write_heartbeat(sleeve_dir / "heartbeat.json", now)
+    assert watchdog(once=True, max_age=timedelta(hours=2)) == 0
+    assert heartbeat_path(ctx.data_dir).name == "heartbeat.json"
 
 
 def test_flatten_and_ib_venue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -119,12 +130,14 @@ def test_flatten_and_ib_venue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv("STRATEGY_CONFIG_PATH", str(repo / "config" / "strategy.yaml"))
     monkeypatch.setenv("RUNTIME_CONFIG_PATH", str(repo / "config" / "runtime.yaml"))
     monkeypatch.setenv("RISK_CONFIG_PATH", str(repo / "config" / "risk.yaml"))
+    monkeypatch.setenv("SLEEVES_CONFIG_PATH", str(repo / "config" / "sleeves.yaml"))
+    monkeypatch.setenv("SLEEVE", "tqqq")
     ctx, broker = _ctx(data, positions={"TQQQ": 50})
     store = ctx.store
     now = datetime(2024, 6, 3, 15, 59, tzinfo=ET)
     store.record_fill(
-        order_ref="qqq-rsi:x",
-        signal_id="qqq-rsi-2024-06-03-entry-oversold",
+        order_ref="rsi-cross:tqqq:x",
+        signal_id="rsi-cross-tqqq-2024-06-03-entry-oversold",
         symbol="TQQQ",
         side="BUY",
         quantity=50,
@@ -136,12 +149,12 @@ def test_flatten_and_ib_venue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
 
     venue = IbVenue(broker, "DU123456")
     intent = OrderIntent(
-        signal_id="qqq-rsi-2024-06-03-exit",
+        signal_id="rsi-cross-2024-06-03-exit",
         symbol="TQQQ",
         side="SELL",
         quantity=10,
         limit_price=49.9,
-        order_ref="qqq-rsi:qqq-rsi-2024-06-03-exit",
+        order_ref="rsi-cross:rsi-cross-2024-06-03-exit",
     )
     rec = venue.submit(intent)
     assert rec.status is OrderStatus.FILLED
@@ -182,8 +195,8 @@ def test_runtime_helpers(tmp_path: Path) -> None:
 
 
 def test_risk_branches() -> None:
-    from qqq_rsi_bot.core.models import EntryReason
-    from qqq_rsi_bot.engine.signal_engine import IndicatorSnapshot, SignalDecision
+    from rsi_cross_swing_bot.core.models import EntryReason
+    from rsi_cross_swing_bot.engine.signal_engine import IndicatorSnapshot, SignalDecision
 
     snap = IndicatorSnapshot(
         session_date=date(2024, 6, 3),
@@ -196,7 +209,7 @@ def test_risk_branches() -> None:
     )
     enter = SignalDecision(
         SignalAction.ENTER,
-        "qqq-rsi-2024-06-03-entry-oversold",
+        "rsi-cross-2024-06-03-entry-oversold",
         EntryReason.OVERSOLD,
         snap,
         True,
@@ -233,36 +246,45 @@ def test_risk_branches() -> None:
 
 
 def test_telegram_more(tmp_path: Path) -> None:
+    from rsi_cross_swing_bot.runtime.telegram_commands import ControlContext, SleeveView
+
     replies: list[str] = []
-    ctx = CommandContext(
-        data_dir=tmp_path,
-        reply=replies.append,
+    view = SleeveView(
+        sleeve_id="tqqq",
+        data_dir=tmp_path / "tqqq",
         status_text=lambda: "status",
         positions_text=lambda: "pos",
-        flatten=lambda: "flat",
         get_allocated=lambda: 10_000.0,
         risk_min=100,
         risk_max=1_000_000,
+    )
+    view.data_dir.mkdir(parents=True, exist_ok=True)
+    ctx = ControlContext(
+        sleeves={"tqqq": view},
+        reply=replies.append,
         today=lambda: date(2024, 6, 3),
+        version="0.2.0",
     )
     for cmd in (
         "/status",
         "/version",
         "/positions",
-        "/flatten",
-        "/start",
-        "/clearhalt",
-        "/reconcile",
-        "/allocation",
+        "/flatten tqqq",
+        "/start tqqq",
+        "/clearhalt tqqq",
+        "/reconcile tqqq",
+        "/allocation tqqq",
         "/pnl",
         "/nope",
         "",
-        "/allocation bad",
-        "/allocation 1",
+        "/allocation tqqq bad",
+        "/allocation tqqq 1",
+        "/sleeves",
+        "/dryrun tqqq on",
     ):
         handle_command(cmd, ctx)
-    set_halt(tmp_path, "x")
-    handle_command("/reconcile", ctx)
+    set_halt(view.data_dir, "x")
+    handle_command("/reconcile tqqq", ctx)
 
 
 def test_session_hourly_and_decision_due(tmp_path: Path) -> None:
@@ -287,9 +309,7 @@ def test_session_hourly_and_decision_due(tmp_path: Path) -> None:
         store=store,
         risk=RiskGate(allocated_usd=10_000),
         orders=OrderManager(
-            __import__("qqq_rsi_bot.execution.dry_run_venue", fromlist=["DryRunVenue"]).DryRunVenue(
-                broker.quote
-            ),
+            DryRunVenue(broker.quote),
             store,
         ),
         notifier=NullNotifier(),
@@ -310,8 +330,8 @@ def test_session_hourly_and_decision_due(tmp_path: Path) -> None:
     # mismatch halt path
     session.data = broker
     store.record_fill(
-        order_ref="qqq-rsi:e",
-        signal_id="qqq-rsi-2024-06-03-entry-oversold",
+        order_ref="rsi-cross:e",
+        signal_id="rsi-cross-2024-06-03-entry-oversold",
         symbol="TQQQ",
         side="BUY",
         quantity=20,
@@ -327,7 +347,7 @@ def test_store_signals_and_orders(tmp_path: Path) -> None:
     store = TradeStore(tmp_path / "t.sqlite3")
     now = datetime(2024, 6, 3, 15, 59, tzinfo=ET)
     assert store.record_signal(
-        "qqq-rsi-2024-06-03-entry-oversold",
+        "rsi-cross-2024-06-03-entry-oversold",
         date(2024, 6, 3),
         "ENTER",
         "seen",
@@ -335,21 +355,21 @@ def test_store_signals_and_orders(tmp_path: Path) -> None:
         {"x": 1},
         reason="oversold",
     )
-    assert store.signal_exists("qqq-rsi-2024-06-03-entry-oversold")
-    store.set_signal_status("qqq-rsi-2024-06-03-entry-oversold", "FILLED")
+    assert store.signal_exists("rsi-cross-2024-06-03-entry-oversold")
+    store.set_signal_status("rsi-cross-2024-06-03-entry-oversold", "FILLED")
     store.upsert_order(
         idempotency_key="k",
-        signal_id="qqq-rsi-2024-06-03-entry-oversold",
+        signal_id="rsi-cross-2024-06-03-entry-oversold",
         side="BUY",
         quantity=10,
         limit_price=50.0,
         status="FILLED",
-        order_ref="qqq-rsi:x",
+        order_ref="rsi-cross:x",
         updated_at=now,
         filled_qty=10,
         avg_price=50.0,
     )
-    assert store.order_by_signal("qqq-rsi-2024-06-03-entry-oversold") is not None
+    assert store.order_by_signal("rsi-cross-2024-06-03-entry-oversold") is not None
     assert store.signals_for_day(date(2024, 6, 3))
     assert store.orders_for_day(date(2024, 6, 3))
     store.close()
@@ -368,7 +388,7 @@ def test_compute_snapshot_and_replay() -> None:
 
 
 def test_order_record_transition() -> None:
-    intent = OrderIntent("s", "TQQQ", "BUY", 1, 10.0, "qqq-rsi:s")
+    intent = OrderIntent("s", "TQQQ", "BUY", 1, 10.0, "rsi-cross:s")
     rec = OrderRecord(intent)
     rec.transition(OrderStatus.SENT)
     with pytest.raises(ValueError):

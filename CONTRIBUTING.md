@@ -1,4 +1,4 @@
-# Working on the QQQ RSI bot
+# Working on the RSI cross swing bot
 
 ## Setup
 
@@ -13,7 +13,7 @@ Copy `.env.example` to `.env`. Never commit secrets or `data/`.
 
 1. `scripts\dev.ps1 ci` is green: ruff, mypy strict, import-linter, tests, coverage ≥ 90.
 2. New behaviour has tests, including the failure case.
-3. Strategy changes bump the version in `pyproject.toml` and `src/qqq_rsi_bot/__init__.py`.
+3. Strategy changes bump the version in `pyproject.toml` and `src/rsi_cross_swing_bot/__init__.py`.
 4. No secrets or runtime `data/` in the diff.
 
 ## Architecture

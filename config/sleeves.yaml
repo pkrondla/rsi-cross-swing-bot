@@ -1,0 +1,17 @@
+# Per-sleeve books. Shared RSI params live in strategy.yaml / runtime.yaml / risk.yaml.
+# CD/NSSM auto-install RsiCross-<id> for every entry here (unique ib_client_id required).
+# Local: rsi-bot serve --sleeve <id>
+
+sleeves:
+  tqqq:
+    signal_symbol: QQQ
+    execution_symbol: TQQQ
+    order_ref_prefix: "rsi-cross:tqqq:"
+    ib_client_id: 17
+    allocated_usd: 10000
+  goog:
+    signal_symbol: GOOG
+    execution_symbol: GOOG
+    order_ref_prefix: "rsi-cross:goog:"
+    ib_client_id: 18
+    allocated_usd: 10000

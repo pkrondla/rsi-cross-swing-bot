@@ -1,4 +1,4 @@
-name: CD - Deploy QQQ RSI bot to Windows EC2
+name: CD - Deploy RSI cross swing bot to Windows EC2
 
 on:
   workflow_dispatch:
@@ -9,17 +9,17 @@ permissions:
 
 jobs:
   deploy:
-    environment: qqq-prod
+    environment: prod
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      # Secrets: WINRM_PASSWORD, GH_PAT, TELEGRAM_BOT_TOKEN
-      # Variables: WINRM_HOST, WINRM_USERNAME, TELEGRAM_CHAT_ID, IB_HOST, IB_PORT,
-      #            IB_CLIENT_ID, IB_ACCOUNT, ALLOCATED_USD, LIVE_MODE, LIVE_ARMED,
-      #            DRY_RUN, HEALTHCHECK_URL (optional)
+      # Secrets (credentials only): WINRM_PASSWORD, GH_PAT, TELEGRAM_BOT_TOKEN
+      # Variables (everything else): WINRM_HOST, WINRM_USERNAME, TELEGRAM_CHAT_ID,
+      #   IB_HOST, IB_PORT, IB_ACCOUNT, LIVE_MODE, LIVE_ARMED, DRY_RUN,
+      #   HEALTHCHECK_URL, SLEEVE_ALLOCATIONS (optional JSON)
       #
-      # Deploys only to C:\qqq-rsi-bot and services QqqRsiBot / QqqRsiWatch.
-      # Never stops OrbBot.
+      # Sleeves/services come from config/sleeves.yaml automatically.
+      # Migrates data from C:\qqq-rsi-bot if present. Never stops OrbBot.
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,26 +37,27 @@ jobs:
 
       - name: Deploy over WinRM (HTTPS 5986)
         env:
-          WINRM_HOST: ${{ vars.WINRM_HOST || secrets.WINRM_HOST }}
-          WINRM_USERNAME: ${{ vars.WINRM_USERNAME || secrets.WINRM_USERNAME }}
+          # Secrets
           WINRM_PASSWORD: ${{ secrets.WINRM_PASSWORD }}
           GH_PAT: ${{ secrets.GH_PAT }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GIT_REF: main
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID || secrets.TELEGRAM_CHAT_ID }}
+          # Variables
+          WINRM_HOST: ${{ vars.WINRM_HOST }}
+          WINRM_USERNAME: ${{ vars.WINRM_USERNAME }}
+          TELEGRAM_CHAT_ID: ${{ vars.TELEGRAM_CHAT_ID }}
           HEALTHCHECK_URL: ${{ vars.HEALTHCHECK_URL || '' }}
           IB_HOST: ${{ vars.IB_HOST || '127.0.0.1' }}
           IB_PORT: ${{ vars.IB_PORT || '4002' }}
-          IB_CLIENT_ID: ${{ vars.IB_CLIENT_ID || '17' }}
-          IB_ACCOUNT: ${{ vars.IB_ACCOUNT || secrets.IB_ACCOUNT || '' }}
-          ALLOCATED_USD: ${{ vars.ALLOCATED_USD || '' }}
+          IB_ACCOUNT: ${{ vars.IB_ACCOUNT || '' }}
           LIVE_MODE: ${{ vars.LIVE_MODE || 'paper' }}
           LIVE_ARMED: ${{ vars.LIVE_ARMED || 'false' }}
           DRY_RUN: ${{ vars.DRY_RUN || 'true' }}
+          SLEEVE_ALLOCATIONS: ${{ vars.SLEEVE_ALLOCATIONS || '' }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GIT_REF: main
         run: |
           python - <<'PY'
-          import os, sys, base64, time, winrm
+          import json, os, sys, base64, time, winrm
           from requests.exceptions import ConnectionError as WinRMDropped
 
           required = ["WINRM_HOST", "WINRM_USERNAME", "WINRM_PASSWORD", "GH_PAT"]
@@ -108,9 +109,7 @@ jobs:
           env_lines = [
               f"IB_HOST={clean('IB_HOST')}",
               f"IB_PORT={clean('IB_PORT')}",
-              f"IB_CLIENT_ID={clean('IB_CLIENT_ID')}",
               f"IB_ACCOUNT={clean('IB_ACCOUNT')}",
-              f"ALLOCATED_USD={clean('ALLOCATED_USD')}",
               "DATA_DIR=data",
               f"TELEGRAM_BOT_TOKEN={clean('TELEGRAM_BOT_TOKEN')}",
               f"TELEGRAM_CHAT_ID={clean('TELEGRAM_CHAT_ID')}",
@@ -119,6 +118,22 @@ jobs:
               f"LIVE_ARMED={clean('LIVE_ARMED')}",
               f"DRY_RUN={clean('DRY_RUN')}",
           ]
+          # Optional capital overrides: SLEEVE_ALLOCATIONS JSON and/or SLEEVE_<ID>_ALLOCATED_USD
+          allocations: dict[str, str] = {}
+          raw_alloc = clean("SLEEVE_ALLOCATIONS")
+          if raw_alloc:
+              parsed = json.loads(raw_alloc)
+              if not isinstance(parsed, dict):
+                  raise SystemExit("SLEEVE_ALLOCATIONS must be a JSON object")
+              allocations = {str(k).lower(): str(v) for k, v in parsed.items()}
+          for key, value in os.environ.items():
+              if key.startswith("SLEEVE_") and key.endswith("_ALLOCATED_USD") and value.strip():
+                  mid = key[len("SLEEVE_") : -len("_ALLOCATED_USD")].lower()
+                  if mid and mid != "allocations":
+                      allocations.setdefault(mid, value.strip())
+          for sid, usd in sorted(allocations.items()):
+              env_lines.append(f"SLEEVE_{sid.upper()}_ALLOCATED_USD={usd}")
+
           clone_url = (
               f"https://x-access-token:{clean('GH_PAT')}@github.com/"
               f"{clean('GITHUB_REPOSITORY')}.git"
@@ -136,9 +151,10 @@ jobs:
                 & $Command
                 if ($LASTEXITCODE -ne 0) {{ throw "$Label failed with exit code $LASTEXITCODE" }}
               }}
-              $repo = "C:\\qqq-rsi-bot"
+              $repo = "C:\\rsi-cross-swing-bot"
+              $legacy = "C:\\qqq-rsi-bot"
               $dataDir = Join-Path $repo "data"
-              $backupDataDir = "C:\\qqq-rsi-bot-data-backup"
+              $backupDataDir = "C:\\rsi-cross-swing-bot-data-backup"
               $deployDir = Join-Path $repo "deploy"
               if (-not (Get-Command nssm -ErrorAction SilentlyContinue)) {{
                 throw "nssm was not found on PATH."
@@ -158,9 +174,11 @@ jobs:
                   & taskkill.exe /F /T /PID $cim.ProcessId | Out-Null
                 }}
               }}
-              Write-Host "stopping QqqRsi services only (OrbBot untouched)"
-              Stop-ServiceQuick QqqRsiBot
-              Stop-ServiceQuick QqqRsiWatch
+              Write-Host "stopping RsiCross / legacy QqqRsi services only (OrbBot untouched)"
+              foreach ($n in @(
+                "RsiCross-tqqq","RsiCross-goog","RsiCrossWatch","RsiCrossCtrl",
+                "RsiCrossSwingBot","RsiCrossSwingWatch","QqqRsiBot","QqqRsiWatch"
+              )) {{ Stop-ServiceQuick $n }}
               New-Item -ItemType Directory -Path $deployDir -Force | Out-Null
               if (Test-Path (Join-Path $repo ".git")) {{
                 $prev = (git -c core.pager=cat -C $repo rev-parse HEAD).Trim()
@@ -181,6 +199,12 @@ jobs:
                   Move-Item -Path $backupDataDir -Destination $dataDir
                 }}
               }}
+              # One-time migrate legacy C:\\qqq-rsi-bot\\data into new tree
+              if ((Test-Path (Join-Path $legacy "data")) -and -not (Test-Path (Join-Path $dataDir "sleeves"))) {{
+                Write-Host "migrating legacy data from $legacy"
+                New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+                Copy-Item -Recurse -Force (Join-Path $legacy "data\\*") $dataDir
+              }}
               New-Item -ItemType Directory -Path (Join-Path $repo "logs") -Force | Out-Null
               New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
               """,
@@ -190,7 +214,7 @@ jobs:
           run_ps(
               """
               $ErrorActionPreference = "Stop"
-              $repo = "C:\\qqq-rsi-bot"
+              $repo = "C:\\rsi-cross-swing-bot"
               $envPath = Join-Path $repo ".env"
               $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
               [System.IO.File]::WriteAllText($envPath, "", $utf8NoBom)
@@ -203,7 +227,7 @@ jobs:
               run_ps(
                   f"""
                   $ErrorActionPreference = "Stop"
-                  $repo = "C:\\qqq-rsi-bot"
+                  $repo = "C:\\rsi-cross-swing-bot"
                   $envPath = Join-Path $repo ".env"
                   $line = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("{line_b64}"))
                   $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -215,7 +239,7 @@ jobs:
           run_ps(
               """
               $ErrorActionPreference = "Stop"
-              $helper = "C:\\qqq-rsi-bot\\scripts\\deploy\\Nssm-QqqRsiServices.ps1"
+              $helper = "C:\\rsi-cross-swing-bot\\scripts\\deploy\\Nssm-RsiCrossServices.ps1"
               Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
               & $helper -Action Stop
               """,
@@ -230,7 +254,7 @@ jobs:
                 & $Command
                 if ($LASTEXITCODE -ne 0) { throw "$Label failed with exit code $LASTEXITCODE" }
               }
-              $repo = "C:\\qqq-rsi-bot"
+              $repo = "C:\\rsi-cross-swing-bot"
               $venv = Join-Path $repo ".venv\\Scripts\\python.exe"
               $py = @(
                 "C:\\Program Files\\Python312\\python.exe",
@@ -251,49 +275,25 @@ jobs:
           run_ps(
               """
               $ErrorActionPreference = "Stop"
-              $repo = "C:\\qqq-rsi-bot"
-              $venv = Join-Path $repo ".venv\\Scripts\\python.exe"
-              foreach ($pair in @(
-                @("start-qqq-rsi-bot.ps1", "serve"),
-                @("start-qqq-rsi-watch.ps1", "watchdog")
-              )) {
-                $path = Join-Path $repo $pair[0]
-                @(
-                  '$ErrorActionPreference = "Stop"'
-                  "`$repo = `"$repo`""
-                  'Get-Content (Join-Path $repo ".env") -ErrorAction SilentlyContinue | ForEach-Object {'
-                  '  if ($_ -match "^\\s*#" -or [string]::IsNullOrWhiteSpace($_)) { return }'
-                  '  $parts = $_.Split("=", 2)'
-                  '  if ($parts.Count -eq 2) { [System.Environment]::SetEnvironmentVariable($parts[0], $parts[1], "Process") }'
-                  '}'
-                  "Set-Location `$repo"
-                  "& `"$venv`" -m qqq_rsi_bot $($pair[1])"
-                ) | Set-Content -Path $path -Encoding utf8
-              }
-              """,
-              "launchers",
-          )
-
-          run_ps(
-              """
-              $ErrorActionPreference = "Stop"
-              $helper = "C:\\qqq-rsi-bot\\scripts\\deploy\\Nssm-QqqRsiServices.ps1"
+              $repo = "C:\\rsi-cross-swing-bot"
               Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-              & $helper -Action Install
+              & (Join-Path $repo "scripts\\deploy\\Write-RsiCrossLaunchers.ps1") -RepoPath $repo
+              & (Join-Path $repo "scripts\\deploy\\Nssm-RsiCrossServices.ps1") -Action Install -RepoPath $repo
               """,
-              "nssm",
+              "launchers+nssm",
           )
 
           run_ps(
               """
               $ErrorActionPreference = "Continue"
-              $venv = "C:\\qqq-rsi-bot\\.venv\\Scripts\\python.exe"
-              & $venv -m qqq_rsi_bot check
-              if ($LASTEXITCODE -ne 0) {
-                Write-Host "WARNING: qqq-bot check failed (Gateway/login/data). Services are running."
-              } else {
-                Write-Host "Deploy complete."
+              $repo = "C:\\rsi-cross-swing-bot"
+              $venv = Join-Path $repo ".venv\\Scripts\\python.exe"
+              $ids = & (Join-Path $repo "scripts\\deploy\\Get-SleeveIds.ps1") -RepoPath $repo
+              foreach ($sid in $ids) {
+                Write-Host "check --sleeve $sid"
+                & $venv -m rsi_cross_swing_bot check --sleeve $sid
               }
+              Write-Host "Deploy complete (check warnings above are non-fatal)."
               """,
               "check",
           )

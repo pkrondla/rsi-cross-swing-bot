@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from qqq_rsi_bot.indicators import ema, rsi_wilder, sma
+from rsi_cross_swing_bot.indicators import ema, rsi_wilder, sma
 
 
 def test_sma_simple() -> None:

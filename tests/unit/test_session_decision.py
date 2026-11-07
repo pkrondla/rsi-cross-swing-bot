@@ -4,22 +4,22 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from qqq_rsi_bot.adapters.ib.client import FakeIbClient
-from qqq_rsi_bot.config.settings import (
+from rsi_cross_swing_bot.adapters.ib.client import FakeIbClient
+from rsi_cross_swing_bot.config.settings import (
     AppConfig,
     RiskConfig,
     RuntimeConfig,
     Settings,
     StrategyConfig,
 )
-from qqq_rsi_bot.core.clock import FixedClock
-from qqq_rsi_bot.core.models import Bar, Quote, SignalAction
-from qqq_rsi_bot.execution.dry_run_venue import DryRunVenue
-from qqq_rsi_bot.execution.order_manager import OrderManager
-from qqq_rsi_bot.risk.gate import RiskGate
-from qqq_rsi_bot.runtime.notify import NullNotifier
-from qqq_rsi_bot.runtime.session import TradingSession
-from qqq_rsi_bot.storage.store import TradeStore
+from rsi_cross_swing_bot.core.clock import FixedClock
+from rsi_cross_swing_bot.core.models import Bar, Quote, SignalAction
+from rsi_cross_swing_bot.execution.dry_run_venue import DryRunVenue
+from rsi_cross_swing_bot.execution.order_manager import OrderManager
+from rsi_cross_swing_bot.risk.gate import RiskGate
+from rsi_cross_swing_bot.runtime.notify import NullNotifier
+from rsi_cross_swing_bot.runtime.session import TradingSession
+from rsi_cross_swing_bot.storage.store import TradeStore
 
 ET = ZoneInfo("America/New_York")
 

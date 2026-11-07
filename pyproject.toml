@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "qqq-rsi-bot"
-version = "0.1.0"
-description = "QQQ signal / TQQQ execution RSI cross bot (paper by default, live disarmed)"
+name = "rsi-cross-swing-bot"
+version = "0.2.0"
+description = "Multi-sleeve RSI cross swing bot (QQQ→TQQQ, GOOG, …; paper by default)"
 requires-python = ">=3.12"
 dependencies = [
     "ib_async>=2.0",
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-qqq-bot = "qqq_rsi_bot.cli:main"
+rsi-bot = "rsi_cross_swing_bot.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -52,12 +52,13 @@ mypy_path = "src"
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["src/qqq_rsi_bot"]
+source = ["src/rsi_cross_swing_bot"]
 branch = true
 omit = [
-    "src/qqq_rsi_bot/__main__.py",
-    "src/qqq_rsi_bot/adapters/**",
-    "src/qqq_rsi_bot/cli.py",
+    "src/rsi_cross_swing_bot/__main__.py",
+    "src/rsi_cross_swing_bot/adapters/**",
+    "src/rsi_cross_swing_bot/cli.py",
+    "src/rsi_cross_swing_bot/app/telegram_control.py",
 ]
 
 [tool.coverage.report]
@@ -67,40 +68,40 @@ skip_covered = true
 exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]
 
 [tool.importlinter]
-root_package = "qqq_rsi_bot"
+root_package = "rsi_cross_swing_bot"
 include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Layers: each layer only imports from layers below it"
 type = "layers"
 layers = [
-    "qqq_rsi_bot.cli",
-    "qqq_rsi_bot.app",
-    "qqq_rsi_bot.runtime",
-    "qqq_rsi_bot.execution",
-    "qqq_rsi_bot.storage",
-    "qqq_rsi_bot.risk",
-    "qqq_rsi_bot.engine",
-    "qqq_rsi_bot.indicators",
-    "qqq_rsi_bot.core",
+    "rsi_cross_swing_bot.cli",
+    "rsi_cross_swing_bot.app",
+    "rsi_cross_swing_bot.runtime",
+    "rsi_cross_swing_bot.execution",
+    "rsi_cross_swing_bot.storage",
+    "rsi_cross_swing_bot.risk",
+    "rsi_cross_swing_bot.engine",
+    "rsi_cross_swing_bot.indicators",
+    "rsi_cross_swing_bot.core",
 ]
 
 [[tool.importlinter.contracts]]
 name = "Strategy core never touches brokers, storage, runtime or I/O libraries"
 type = "forbidden"
 source_modules = [
-    "qqq_rsi_bot.core",
-    "qqq_rsi_bot.indicators",
-    "qqq_rsi_bot.engine",
-    "qqq_rsi_bot.risk",
+    "rsi_cross_swing_bot.core",
+    "rsi_cross_swing_bot.indicators",
+    "rsi_cross_swing_bot.engine",
+    "rsi_cross_swing_bot.risk",
 ]
 forbidden_modules = [
-    "qqq_rsi_bot.adapters",
-    "qqq_rsi_bot.storage",
-    "qqq_rsi_bot.execution",
-    "qqq_rsi_bot.runtime",
-    "qqq_rsi_bot.app",
-    "qqq_rsi_bot.cli",
+    "rsi_cross_swing_bot.adapters",
+    "rsi_cross_swing_bot.storage",
+    "rsi_cross_swing_bot.execution",
+    "rsi_cross_swing_bot.runtime",
+    "rsi_cross_swing_bot.app",
+    "rsi_cross_swing_bot.cli",
     "ib_async",
     "sqlite3",
     "requests",
@@ -110,13 +111,13 @@ forbidden_modules = [
 [[tool.importlinter.contracts]]
 name = "Broker adapters do not import strategy, execution or runtime code"
 type = "forbidden"
-source_modules = ["qqq_rsi_bot.adapters"]
+source_modules = ["rsi_cross_swing_bot.adapters"]
 forbidden_modules = [
-    "qqq_rsi_bot.engine",
-    "qqq_rsi_bot.risk",
-    "qqq_rsi_bot.execution",
-    "qqq_rsi_bot.runtime",
-    "qqq_rsi_bot.app",
-    "qqq_rsi_bot.cli",
-    "qqq_rsi_bot.storage",
+    "rsi_cross_swing_bot.engine",
+    "rsi_cross_swing_bot.risk",
+    "rsi_cross_swing_bot.execution",
+    "rsi_cross_swing_bot.runtime",
+    "rsi_cross_swing_bot.app",
+    "rsi_cross_swing_bot.cli",
+    "rsi_cross_swing_bot.storage",
 ]

@@ -1,9 +1,7 @@
-signal_symbol: QQQ
-execution_symbol: TQQQ
+# Shared RSI cross parameters (symbols come from config/sleeves.yaml).
 rsi_period: 14
 rsi_ma_period: 14
 ema_period: 200
 oversold_rsi_max: 50
 slippage_bps: 10
-order_ref_prefix: "qqq-rsi:"
 history_days: 1100

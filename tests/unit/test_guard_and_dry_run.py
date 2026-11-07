@@ -5,16 +5,16 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from qqq_rsi_bot.adapters.ib.client import FakeIbClient
-from qqq_rsi_bot.config.settings import Settings
-from qqq_rsi_bot.core.models import Quote
-from qqq_rsi_bot.core.signal_id import order_ref
-from qqq_rsi_bot.execution.dry_run_venue import DryRunVenue
-from qqq_rsi_bot.execution.ib_venue import IbVenue
-from qqq_rsi_bot.execution.models import OrderIntent
-from qqq_rsi_bot.execution.order_manager import OrderManager
-from qqq_rsi_bot.runtime.guard import SafetyError, assert_order_config
-from qqq_rsi_bot.storage.store import TradeStore
+from rsi_cross_swing_bot.adapters.ib.client import FakeIbClient
+from rsi_cross_swing_bot.config.settings import Settings
+from rsi_cross_swing_bot.core.models import Quote
+from rsi_cross_swing_bot.core.signal_id import order_ref
+from rsi_cross_swing_bot.execution.dry_run_venue import DryRunVenue
+from rsi_cross_swing_bot.execution.ib_venue import IbVenue
+from rsi_cross_swing_bot.execution.models import OrderIntent
+from rsi_cross_swing_bot.execution.order_manager import OrderManager
+from rsi_cross_swing_bot.runtime.guard import SafetyError, assert_order_config
+from rsi_cross_swing_bot.storage.store import TradeStore
 
 ET = ZoneInfo("America/New_York")
 
@@ -33,12 +33,12 @@ def test_dry_run_never_calls_place_order(tmp_path) -> None:  # type: ignore[no-u
     venue = DryRunVenue(broker.quote)
     om = OrderManager(venue, store)
     intent = OrderIntent(
-        signal_id="qqq-rsi-2024-06-03-entry-oversold",
+        signal_id="rsi-cross-2024-06-03-entry-oversold",
         symbol="TQQQ",
         side="BUY",
         quantity=10,
         limit_price=50.15,
-        order_ref=order_ref("qqq-rsi-2024-06-03-entry-oversold"),
+        order_ref=order_ref("rsi-cross-2024-06-03-entry-oversold"),
     )
     record = om.submit(intent, datetime(2024, 6, 3, 15, 58, tzinfo=ET))
     assert record.filled_qty == 10
@@ -61,12 +61,12 @@ def test_ib_venue_records_place(tmp_path) -> None:  # type: ignore[no-untyped-de
     venue = IbVenue(broker, "DU123")
     om = OrderManager(venue, store)
     intent = OrderIntent(
-        signal_id="qqq-rsi-2024-06-03-entry-oversold",
+        signal_id="rsi-cross-2024-06-03-entry-oversold",
         symbol="TQQQ",
         side="BUY",
         quantity=10,
         limit_price=50.15,
-        order_ref=order_ref("qqq-rsi-2024-06-03-entry-oversold"),
+        order_ref=order_ref("rsi-cross-2024-06-03-entry-oversold"),
     )
     om.submit(intent, datetime(2024, 6, 3, 15, 58, tzinfo=ET))
     assert len(calls) == 1
@@ -84,12 +84,12 @@ def test_signal_idempotent(tmp_path) -> None:  # type: ignore[no-untyped-def]
     store = TradeStore(tmp_path / "t.sqlite3")
     om = OrderManager(DryRunVenue(broker.quote), store)
     intent = OrderIntent(
-        signal_id="qqq-rsi-2024-06-03-entry-oversold",
+        signal_id="rsi-cross-2024-06-03-entry-oversold",
         symbol="TQQQ",
         side="BUY",
         quantity=10,
         limit_price=50.15,
-        order_ref=order_ref("qqq-rsi-2024-06-03-entry-oversold"),
+        order_ref=order_ref("rsi-cross-2024-06-03-entry-oversold"),
     )
     now = datetime(2024, 6, 3, 15, 58, tzinfo=ET)
     om.submit(intent, now)

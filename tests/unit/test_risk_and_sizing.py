@@ -3,9 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from qqq_rsi_bot.core.models import EntryReason, SignalAction
-from qqq_rsi_bot.engine.signal_engine import IndicatorSnapshot, SignalDecision
-from qqq_rsi_bot.risk.gate import RiskGate, share_count
+from rsi_cross_swing_bot.core.models import EntryReason, SignalAction
+from rsi_cross_swing_bot.engine.signal_engine import IndicatorSnapshot, SignalDecision
+from rsi_cross_swing_bot.risk.gate import RiskGate, share_count
 
 ET = ZoneInfo("America/New_York")
 
@@ -34,7 +34,7 @@ def _enter_decision() -> SignalDecision:
     )
     return SignalDecision(
         action=SignalAction.ENTER,
-        signal_id="qqq-rsi-2024-06-03-entry-oversold",
+        signal_id="rsi-cross-2024-06-03-entry-oversold",
         reason=EntryReason.OVERSOLD,
         snapshot=snap,
         bullish_cross=True,
@@ -47,7 +47,7 @@ def test_exit_sells_bot_qty_not_account() -> None:
     snap = _enter_decision().snapshot
     decision = SignalDecision(
         action=SignalAction.EXIT,
-        signal_id="qqq-rsi-2024-06-03-exit",
+        signal_id="rsi-cross-2024-06-03-exit",
         reason=None,
         snapshot=snap,
         bullish_cross=False,
@@ -77,7 +77,7 @@ def test_account_below_bot_blocks_exit() -> None:
     snap = _enter_decision().snapshot
     decision = SignalDecision(
         action=SignalAction.EXIT,
-        signal_id="qqq-rsi-2024-06-03-exit",
+        signal_id="rsi-cross-2024-06-03-exit",
         reason=None,
         snapshot=snap,
         bullish_cross=False,

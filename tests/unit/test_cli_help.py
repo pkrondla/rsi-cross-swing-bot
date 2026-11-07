@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from qqq_rsi_bot.cli import build_parser, main
+from rsi_cross_swing_bot.cli import build_parser, main
 
 
 def test_parser_has_commands() -> None:

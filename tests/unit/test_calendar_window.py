@@ -3,7 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from qqq_rsi_bot.runtime.calendar import decision_datetime, in_decision_window, is_trading_day
+from rsi_cross_swing_bot.runtime.calendar import (
+    decision_datetime,
+    in_decision_window,
+    is_trading_day,
+)
 
 ET = ZoneInfo("America/New_York")
 

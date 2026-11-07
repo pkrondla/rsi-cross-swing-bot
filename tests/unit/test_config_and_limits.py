@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from qqq_rsi_bot import __version__
-from qqq_rsi_bot.config.fingerprint import strategy_hash
-from qqq_rsi_bot.config.settings import RiskConfig, StrategyConfig, load_config
-from qqq_rsi_bot.risk.limits import resolve_allocation, save_allocation_override
+from rsi_cross_swing_bot import __version__
+from rsi_cross_swing_bot.config.fingerprint import strategy_hash
+from rsi_cross_swing_bot.config.settings import RiskConfig, StrategyConfig, load_config
+from rsi_cross_swing_bot.risk.limits import resolve_allocation, save_allocation_override
 
 
 def test_version_matches_pyproject() -> None:

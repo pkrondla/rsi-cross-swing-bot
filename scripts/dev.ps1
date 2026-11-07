@@ -6,7 +6,7 @@ param(
     [Parameter(Position = 0)]
     [ValidateSet("setup", "lint", "types", "imports", "test", "cov", "audit", "lock", "ci")]
     [string]$Task = "ci",
-    [string]$Venv = (Join-Path $env:USERPROFILE "venvs\qqq-rsi-bot")
+    [string]$Venv = (Join-Path $env:USERPROFILE "venvs\rsi-cross-swing-bot")
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,17 +47,17 @@ switch ($Task) {
     }
     "lock" {
         Need-Venv
-        $tmp = Join-Path $env:TEMP "qqq-rsi-bot-lock"
+        $tmp = Join-Path $env:TEMP "rsi-cross-swing-bot-lock"
         if (Test-Path $tmp) { Remove-Item -Recurse -Force $tmp }
         python -m venv $tmp
         $tp = Join-Path $tmp "Scripts\python.exe"
         Run "resolve runtime" {
             & $tp -m pip install --quiet .
-            & $tp -m pip freeze --exclude qqq-rsi-bot | Out-File -Encoding ascii requirements.lock
+            & $tp -m pip freeze --exclude rsi-cross-swing-bot | Out-File -Encoding ascii requirements.lock
         }
         Run "resolve dev" {
             & $tp -m pip install --quiet ".[dev]"
-            & $tp -m pip freeze --exclude qqq-rsi-bot | Out-File -Encoding ascii requirements-dev.lock
+            & $tp -m pip freeze --exclude rsi-cross-swing-bot | Out-File -Encoding ascii requirements-dev.lock
         }
         Remove-Item -Recurse -Force $tmp
         Write-Host "Lock files rewritten. Review the diff, run 'dev.ps1 ci', then commit." -ForegroundColor Green
