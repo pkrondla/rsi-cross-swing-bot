@@ -20,6 +20,10 @@ Paper / dry-run by default. Real orders need `LIVE_ARMED=true` and `DRY_RUN=fals
 - Each sleeve spends its own `allocated_usd` (whole shares).
 - Sells **only shares that sleeve bought** (local fill ledger + `orderRef` prefix). Other holdings in the IB account are left alone.
 
+## Watchlist alerts
+
+`rsi-bot watch` is a read-only alerting process: hourly during NYSE hours it checks every symbol on the Telegram-managed watchlist (`/watch add AAPL`) and sends the day's first RSI×SMA-of-RSI cross per direction as a BUY/SELL alert. No orders, ever. For an alerts-only bot set `sleeves: {}` in `config/sleeves.yaml`. See [docs/RUNBOOK.md](docs/RUNBOOK.md#watchlist-rsicrosslist).
+
 ## Setup
 
 ```powershell
@@ -37,6 +41,7 @@ rsi-bot serve --sleeve tqqq
 rsi-bot serve --sleeve goog
 rsi-bot watchdog
 rsi-bot telegram
+rsi-bot watch
 rsi-bot replay --sleeve tqqq --last 60
 rsi-bot status --all
 rsi-bot flatten --sleeve tqqq

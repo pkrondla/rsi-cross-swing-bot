@@ -12,6 +12,7 @@ from rsi_cross_swing_bot.app.health import run_checks, status_report
 from rsi_cross_swing_bot.app.replay import replay_bars
 from rsi_cross_swing_bot.app.serve import flatten_bot_qty, serve
 from rsi_cross_swing_bot.app.telegram_control import telegram_control
+from rsi_cross_swing_bot.app.watch import watch
 from rsi_cross_swing_bot.app.watchdog import watchdog
 from rsi_cross_swing_bot.config.settings import list_sleeve_ids
 from rsi_cross_swing_bot.core.clock import SystemClock
@@ -55,6 +56,10 @@ def cmd_watchdog(args: argparse.Namespace) -> int:
 
 def cmd_telegram(args: argparse.Namespace) -> int:
     return telegram_control(once=bool(args.once))
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    return watch(once=bool(args.once))
 
 
 def cmd_flatten(args: argparse.Namespace) -> int:
@@ -146,6 +151,9 @@ def build_parser() -> argparse.ArgumentParser:
     tg_p = sub.add_parser("telegram", help="Telegram control process (sole getUpdates poller)")
     tg_p.add_argument("--once", action="store_true")
 
+    wl_p = sub.add_parser("watch", help="Read-only watchlist RSI-cross alerts (no orders)")
+    wl_p.add_argument("--once", action="store_true")
+
     flat_p = sub.add_parser("flatten", help="Sell only this sleeve's bot quantity")
     _add_sleeve_arg(flat_p)
 
@@ -170,6 +178,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "serve": cmd_serve,
         "watchdog": cmd_watchdog,
         "telegram": cmd_telegram,
+        "watch": cmd_watch,
         "flatten": cmd_flatten,
         "summary": cmd_summary,
         "replay": cmd_replay,

@@ -26,6 +26,7 @@ foreach ($line in Get-Content -LiteralPath $path) {
 }
 
 if ($ids.Count -eq 0) {
-    throw "No sleeves found in $path"
+    # `sleeves: {}` is a supported watch-only deployment (no trading services).
+    Write-Host "No sleeves in $path (watch-only deployment)"
 }
 $ids

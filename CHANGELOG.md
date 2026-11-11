@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Read-only watchlist alerts: new `rsi-bot watch` process (NSSM `RsiCrossList`) scans watched symbols hourly through the NYSE session and Telegrams the first RSI×SMA-of-RSI cross per direction per day. Read-only IB connection on `WATCH_IB_CLIENT_ID` (default 77); no order path.
+- Telegram `/watch` commands: `/watch [list]`, `/watch add <sym>`, `/watch remove <sym>`, `/watch long <sym>`, `/watch flat <sym>` (list + marks in `data/watchlist/watchlist.json`, alert dedupe + virtual position in `data/watchlist/state.json`, both written atomically).
+- Watch-only deployments: `sleeves: {}` is now valid; control, watchdog and deploy scripts run with no sleeves. The watchdog also monitors the watchlist heartbeat.
+- `IbClient` reconnects after the gateway drops instead of failing every call until restart (sleeves benefit too).
+- CD stops `RsiCrossList` and any `RsiCross-*` service before updating code.
+
 ## 0.2.0
 
 - Rename package/CLI/deploy path to `rsi-cross-swing-bot` / `rsi-bot` / `C:\rsi-cross-swing-bot`.

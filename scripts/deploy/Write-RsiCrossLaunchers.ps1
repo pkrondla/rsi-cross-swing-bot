@@ -46,4 +46,5 @@ foreach ($sid in $sleeveIds) {
 }
 Write-Launcher -File "start-rsi-cross-watch.ps1" -ModuleArgs "watchdog"
 Write-Launcher -File "start-rsi-cross-ctrl.ps1" -ModuleArgs "telegram"
+Write-Launcher -File "start-rsi-cross-list.ps1" -ModuleArgs "watch"
 Write-Host "launchers written for $($sleeveIds.Count) sleeve(s)"

@@ -16,7 +16,8 @@ jobs:
       # Secrets (credentials only): WINRM_PASSWORD, GH_PAT, TELEGRAM_BOT_TOKEN
       # Variables (everything else): WINRM_HOST, WINRM_USERNAME, TELEGRAM_CHAT_ID,
       #   IB_HOST, IB_PORT, IB_ACCOUNT, LIVE_MODE, LIVE_ARMED, DRY_RUN,
-      #   HEALTHCHECK_URL, SLEEVE_ALLOCATIONS (optional JSON)
+      #   HEALTHCHECK_URL, SLEEVE_ALLOCATIONS (optional JSON),
+      #   WATCH_IB_CLIENT_ID (optional; default 77, must not clash with sleeves/OrbBot)
       #
       # Sleeves/services come from config/sleeves.yaml automatically.
       # Migrates data from C:\qqq-rsi-bot if present. Never stops OrbBot.
@@ -53,6 +54,7 @@ jobs:
           LIVE_ARMED: ${{ vars.LIVE_ARMED || 'false' }}
           DRY_RUN: ${{ vars.DRY_RUN || 'true' }}
           SLEEVE_ALLOCATIONS: ${{ vars.SLEEVE_ALLOCATIONS || '' }}
+          WATCH_IB_CLIENT_ID: ${{ vars.WATCH_IB_CLIENT_ID || '' }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GIT_REF: main
         run: |
@@ -118,6 +120,8 @@ jobs:
               f"LIVE_ARMED={clean('LIVE_ARMED')}",
               f"DRY_RUN={clean('DRY_RUN')}",
           ]
+          if clean("WATCH_IB_CLIENT_ID"):
+              env_lines.append(f"WATCH_IB_CLIENT_ID={clean('WATCH_IB_CLIENT_ID')}")
           # Optional capital overrides: SLEEVE_ALLOCATIONS JSON and/or SLEEVE_<ID>_ALLOCATED_USD
           allocations: dict[str, str] = {}
           raw_alloc = clean("SLEEVE_ALLOCATIONS")
@@ -175,10 +179,12 @@ jobs:
                 }}
               }}
               Write-Host "stopping RsiCross / legacy QqqRsi services only (OrbBot untouched)"
-              foreach ($n in @(
-                "RsiCross-tqqq","RsiCross-goog","RsiCrossWatch","RsiCrossCtrl",
+              $names = @(
+                "RsiCrossWatch","RsiCrossCtrl","RsiCrossList",
                 "RsiCrossSwingBot","RsiCrossSwingWatch","QqqRsiBot","QqqRsiWatch"
-              )) {{ Stop-ServiceQuick $n }}
+              )
+              $names += @(Get-Service -Name "RsiCross-*" -ErrorAction SilentlyContinue | ForEach-Object {{ $_.Name }})
+              foreach ($n in $names) {{ Stop-ServiceQuick $n }}
               New-Item -ItemType Directory -Path $deployDir -Force | Out-Null
               if (Test-Path (Join-Path $repo ".git")) {{
                 $prev = (git -c core.pager=cat -C $repo rev-parse HEAD).Trim()

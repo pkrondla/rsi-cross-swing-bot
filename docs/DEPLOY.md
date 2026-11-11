@@ -52,6 +52,7 @@ Put **only credentials** in Secrets. Everything else is a Variable.
 | `LIVE_ARMED` | `false` until intentional |
 | `DRY_RUN` | `true` (default) |
 | `HEALTHCHECK_URL` | optional |
+| `WATCH_IB_CLIENT_ID` | optional IB client id for `RsiCrossList` (default 77); must not clash with sleeves or OrbBot |
 
 Default capital and IB client ids come from [`config/sleeves.yaml`](../config/sleeves.yaml). Each sleeve needs a **unique** `ib_client_id`.
 

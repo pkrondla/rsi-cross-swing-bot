@@ -26,6 +26,7 @@ from rsi_cross_swing_bot.runtime.telegram_commands import (
     handle_control_command,
     poll_updates,
 )
+from rsi_cross_swing_bot.runtime.watchlist import WATCH_DIR_NAME
 from rsi_cross_swing_bot.storage.store import TradeStore
 
 
@@ -105,9 +106,11 @@ def telegram_control(
         reply=notifier.send,
         today=lambda: clock.now().astimezone(ET).date(),
         version=__version__,
+        watch_dir=root / WATCH_DIR_NAME,
     )
     notifier.send(
-        f"rsi-cross-swing-bot telegram control started; sleeves={', '.join(sorted(views))}"
+        "rsi-cross-swing-bot telegram control started; "
+        f"sleeves={', '.join(sorted(views)) or '(none; watch-only)'}"
     )
     token = settings.telegram_bot_token.get_secret_value()
     offset = 0

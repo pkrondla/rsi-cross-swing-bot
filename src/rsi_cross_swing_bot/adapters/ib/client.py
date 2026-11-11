@@ -14,18 +14,27 @@ ET = ZoneInfo("America/New_York")
 
 
 class IbClient:
-    def __init__(self, host: str, port: int, client_id: int) -> None:
+    def __init__(
+        self, host: str, port: int, client_id: int, *, readonly: bool = False
+    ) -> None:
         self._host = host
         self._port = port
         self._client_id = client_id
+        self._readonly = readonly
         self._ib = IB()
         self._connected = False
 
     def connect(self) -> None:
-        if self._connected:
+        if self._connected and self._ib.isConnected():
             return
+        if self._connected:
+            # Gateway dropped (e.g. nightly/weekly IB reset): reset the socket and reconnect.
+            self._ib.disconnect()
+            self._connected = False
         try:
-            self._ib.connect(self._host, self._port, clientId=self._client_id, readonly=False)
+            self._ib.connect(
+                self._host, self._port, clientId=self._client_id, readonly=self._readonly
+            )
         except Exception as exc:  # noqa: BLE001 - surface as data error
             raise DataUnavailableError(f"IB Gateway connect failed: {exc}") from exc
         self._connected = True

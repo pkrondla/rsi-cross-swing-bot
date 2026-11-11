@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     ib_host: str = Field(default="127.0.0.1", alias="IB_HOST")
     ib_port: int = Field(default=4002, alias="IB_PORT")
     ib_client_id: int | None = Field(default=None, alias="IB_CLIENT_ID")
+    watch_ib_client_id: int = Field(default=77, gt=0, alias="WATCH_IB_CLIENT_ID")
     ib_account: str = Field(default="", alias="IB_ACCOUNT")
     allocated_usd: float | None = Field(default=None, alias="ALLOCATED_USD")
     live_mode: Literal["paper", "live"] = Field(default="paper", alias="LIVE_MODE")
@@ -54,6 +55,13 @@ class Settings(BaseSettings):
     def _empty_client_id(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
+        return value
+
+    @field_validator("watch_ib_client_id", mode="before")
+    @classmethod
+    def _empty_watch_client_id(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return 77
         return value
 
     @field_validator("telegram_chat_id", mode="before")
@@ -158,10 +166,13 @@ def _resolve_config_path(path: Path | None, default_name: str) -> Path:
 
 
 def load_sleeve_map(path: Path | None = None) -> dict[str, SleeveConfig]:
+    """Sleeves by id. An explicit empty `sleeves:` means watch-only (no trading)."""
     raw = _load_yaml(_resolve_config_path(path, "sleeves.yaml"))
+    if "sleeves" in raw and raw["sleeves"] in (None, {}):
+        return {}
     block = raw.get("sleeves", raw)
     if not isinstance(block, dict) or not block:
-        raise ValueError("sleeves.yaml must define a non-empty 'sleeves' mapping")
+        raise ValueError("sleeves.yaml must define a 'sleeves' mapping (may be empty)")
     out: dict[str, SleeveConfig] = {}
     for key, value in block.items():
         if not isinstance(value, dict):
@@ -212,6 +223,19 @@ def load_config(
         risk_raw["allocated_usd"] = sleeve.allocated_usd
     risk = RiskConfig.model_validate(risk_raw)
     return AppConfig(strategy=strategy, runtime=runtime, risk=risk)
+
+
+def load_indicator_config(
+    strategy_path: Path | None = None, runtime_path: Path | None = None
+) -> tuple[StrategyConfig, RuntimeConfig]:
+    """Shared RSI/EMA periods and session times, independent of any sleeve."""
+    strategy = StrategyConfig.model_validate(
+        _load_yaml(_resolve_config_path(strategy_path, "strategy.yaml"))
+    )
+    runtime = RuntimeConfig.model_validate(
+        _load_yaml(_resolve_config_path(runtime_path, "runtime.yaml"))
+    )
+    return strategy, runtime
 
 
 def resolve_allocated_usd(settings: Settings, risk: RiskConfig) -> float:

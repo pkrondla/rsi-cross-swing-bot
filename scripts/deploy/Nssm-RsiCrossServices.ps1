@@ -1,6 +1,6 @@
 # NSSM stop/install for multi-sleeve RSI cross bot.
 # Sleeve serve services are derived from config/sleeves.yaml (RsiCross-<id>).
-# Always installs RsiCrossWatch + RsiCrossCtrl. Never touches OrbBot.
+# Always installs RsiCrossWatch + RsiCrossCtrl + RsiCrossList. Never touches OrbBot.
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet("Stop", "Install")]
@@ -161,6 +161,7 @@ switch ($Action) {
     "Stop" {
         Stop-NssmService -Name "RsiCrossWatch"
         Stop-NssmService -Name "RsiCrossCtrl"
+        Stop-NssmService -Name "RsiCrossList"
         foreach ($name in Get-RsiCrossSleeveServices) {
             Stop-NssmService -Name $name
         }
@@ -208,6 +209,12 @@ switch ($Action) {
             -Stdout (Join-Path $logs "rsi-cross-ctrl.log") `
             -Stderr (Join-Path $logs "rsi-cross-ctrl-error.log") `
             -Repo $RepoPath
-        Write-Host "RsiCross services installed for sleeves: $($sleeveIds -join ', ')"
+        Install-NssmService -Name "RsiCrossList" `
+            -Launcher (Join-Path $RepoPath "start-rsi-cross-list.ps1") `
+            -Stdout (Join-Path $logs "rsi-cross-list.log") `
+            -Stderr (Join-Path $logs "rsi-cross-list-error.log") `
+            -Repo $RepoPath
+        $sleeveText = if ($sleeveIds.Count) { $sleeveIds -join ', ' } else { "(none; watch-only)" }
+        Write-Host "RsiCross services installed for sleeves: $sleeveText"
     }
 }

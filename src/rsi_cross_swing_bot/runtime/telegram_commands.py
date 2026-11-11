@@ -16,6 +16,19 @@ from rsi_cross_swing_bot.runtime.day_stop import set_stopped
 from rsi_cross_swing_bot.runtime.dry_run_switch import write_dry_run_override
 from rsi_cross_swing_bot.runtime.halt import clear_halt, halt_reason, is_halted
 from rsi_cross_swing_bot.runtime.inbox import push_command
+from rsi_cross_swing_bot.runtime.watchlist import (
+    WATCH_DIR_NAME,
+    Mark,
+    add_entry,
+    effective_long,
+    last_alert_text,
+    load_entries,
+    load_state,
+    normalize_symbol,
+    remove_entry,
+    set_mark,
+    state_for,
+)
 
 log = logging.getLogger("rsi.telegram")
 
@@ -39,6 +52,7 @@ class ControlContext:
     reply: Callable[[str], None]
     today: Callable[[], date]
     version: str
+    watch_dir: Path = Path("data") / WATCH_DIR_NAME
 
 
 def handle_control_command(text: str, ctx: ControlContext) -> None:
@@ -51,14 +65,21 @@ def handle_control_command(text: str, ctx: ControlContext) -> None:
             "Commands: /help /status [sleeve|all] /positions [sleeve] "
             "/allocation [sleeve] [usd] /stop [sleeve|all] /start [sleeve|all] "
             "/flatten [sleeve|all] /dryrun [sleeve] on|off /reconcile [sleeve] "
-            "/clearhalt [sleeve] /version /sleeves"
+            "/clearhalt [sleeve] /version /sleeves "
+            "/watch [list|add <sym>|remove <sym>|long <sym>|flat <sym>]"
         )
         return
     if cmd == "/version":
         ctx.reply(f"rsi-cross-swing-bot {ctx.version}")
         return
     if cmd == "/sleeves":
-        ctx.reply("sleeves: " + ", ".join(sorted(ctx.sleeves)))
+        ctx.reply("sleeves: " + (", ".join(sorted(ctx.sleeves)) or "(none; watch-only)"))
+        return
+    if cmd == "/watch":
+        _handle_watch(parts, ctx)
+        return
+    if not ctx.sleeves:
+        ctx.reply(f"{cmd}: no sleeves configured (watch-only). /help")
         return
 
     target = _resolve_targets(parts, ctx.sleeves)
@@ -146,6 +167,49 @@ def handle_control_command(text: str, ctx: ControlContext) -> None:
         ctx.reply(f"{cmd}: see /status or rsi-bot summary --sleeve <id>")
         return
     ctx.reply(f"Unknown command {cmd}. /help")
+
+
+_WATCH_USAGE = (
+    "usage: /watch [list] | /watch add <sym> | /watch remove <sym> | /watch long|flat <sym>"
+)
+
+
+def _handle_watch(parts: list[str], ctx: ControlContext) -> None:
+    watch_dir = ctx.watch_dir
+    rest = parts[1:]
+    if not rest or rest[0].lower() == "list":
+        ctx.reply(_watch_list_text(watch_dir))
+        return
+    action = rest[0].lower()
+    if action in {"add", "remove", "long", "flat"} and len(rest) == 2:
+        symbol = normalize_symbol(rest[1])
+        if symbol is None:
+            ctx.reply(f"[watch] invalid symbol {rest[1]!r}")
+            return
+        if action == "add":
+            _, msg = add_entry(watch_dir, symbol)
+        elif action == "remove":
+            _, msg = remove_entry(watch_dir, symbol)
+        else:
+            mark: Mark = "long" if action == "long" else "flat"
+            _, msg = set_mark(watch_dir, symbol, mark)
+        ctx.reply(msg)
+        return
+    ctx.reply(_WATCH_USAGE)
+
+
+def _watch_list_text(watch_dir: Path) -> str:
+    entries = load_entries(watch_dir)
+    if not entries:
+        return "[watch] watchlist empty — /watch add <SYMBOL>"
+    stored = load_state(watch_dir)
+    lines = []
+    for entry in entries:
+        state = state_for(entry, stored)
+        pos = "long" if effective_long(entry, state) else "flat"
+        last = last_alert_text(state)
+        lines.append(f"{entry.symbol} {pos}" + (f" last {last}" if last else ""))
+    return "[watch] " + " | ".join(lines)
 
 
 @dataclass
